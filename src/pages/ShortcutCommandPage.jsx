@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { isUuidLike } from "../lib/presentationKey";
 
 const ACTION_TO_COMMAND = {
   next_slide: "next",
@@ -41,10 +40,12 @@ export default function ShortcutCommandPage() {
 
     let disposed = false;
     let activeChannel = null;
+    let subscribeTimeout = null;
+    let settled = false;
     const normalizedKey = presentationKey.trim().toLowerCase();
 
     (async () => {
-      if (!isUuidLike(normalizedKey)) {
+      if (!/^[a-z0-9]{2,32}$/.test(normalizedKey)) {
         setError(
           "Invalid or expired shortcut URL. Open Presenter and copy the latest session shortcut URLs."
         );
@@ -52,39 +53,79 @@ export default function ShortcutCommandPage() {
         return;
       }
 
-      const resolvedSessionId = normalizedKey;
-
-      const channel = supabase.channel(`session:${resolvedSessionId}`);
+      const channel = supabase.channel(`session:${normalizedKey}`);
       activeChannel = channel;
 
+      // Prevent indefinite "Sending command…" when the channel cannot subscribe.
+      subscribeTimeout = window.setTimeout(() => {
+        if (disposed || settled) return;
+        settled = true;
+        setError("Unable to reach presentation session.");
+        setStatus(null);
+        if (activeChannel) {
+          supabase.removeChannel(activeChannel);
+          activeChannel = null;
+        }
+      }, 5000);
+
       channel.subscribe(async (channelStatus) => {
-        if (disposed || channelStatus !== "SUBSCRIBED") return;
+        if (disposed || settled) return;
 
-        const sendStatus = await channel.send({
-          type: "broadcast",
-          event: "command",
-          payload: {
-            type: parsed.type,
-            ts: Date.now(),
-          },
-        });
+        if (channelStatus === "SUBSCRIBED") {
+          if (subscribeTimeout) {
+            window.clearTimeout(subscribeTimeout);
+            subscribeTimeout = null;
+          }
 
-        if (disposed) return;
+          const sendStatus = await channel.send({
+            type: "broadcast",
+            event: "command",
+            payload: {
+              type: parsed.type,
+              ts: Date.now(),
+            },
+          });
 
-        if (sendStatus === "ok") {
-          setStatus(`Sent: ${parsed.action}`);
-        } else {
-          setError("Failed to send command.");
-          setStatus(null);
+          if (disposed) return;
+
+          if (sendStatus === "ok") {
+            settled = true;
+            setStatus(`Sent: ${parsed.action}`);
+          } else {
+            settled = true;
+            setError("Failed to send command.");
+            setStatus(null);
+          }
+
+          supabase.removeChannel(channel);
+          activeChannel = null;
+          return;
         }
 
-        supabase.removeChannel(channel);
-        activeChannel = null;
+        if (
+          channelStatus === "TIMED_OUT" ||
+          channelStatus === "CLOSED" ||
+          channelStatus === "CHANNEL_ERROR"
+        ) {
+          settled = true;
+          if (subscribeTimeout) {
+            window.clearTimeout(subscribeTimeout);
+            subscribeTimeout = null;
+          }
+
+          setError("Unable to reach presentation session.");
+          setStatus(null);
+          if (activeChannel) {
+            supabase.removeChannel(activeChannel);
+            activeChannel = null;
+          }
+        }
       });
     })();
 
     return () => {
       disposed = true;
+      if (subscribeTimeout) window.clearTimeout(subscribeTimeout);
       if (activeChannel) supabase.removeChannel(activeChannel);
     };
   }, [parsed, presentationKey]);

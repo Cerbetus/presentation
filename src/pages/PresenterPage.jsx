@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useRealtimeCommands } from "../hooks/useRealtimeCommands";
 import { getProvider } from "../providers";
+import { buildPresentationKey } from "../lib/presentationKey";
 
 const COMMAND_LABELS = {
   next: "Next slide",
@@ -75,7 +76,11 @@ export default function PresenterPage() {
     }
   }, []);
 
-  useRealtimeCommands(sessionId, handleCommand);
+  const presentationKey = deck
+    ? buildPresentationKey(deck.name, deck.id)
+    : null;
+
+  useRealtimeCommands(presentationKey, handleCommand);
 
   useEffect(() => {
     (async () => {
@@ -158,9 +163,9 @@ export default function PresenterPage() {
     typeof window === "undefined" ? "https://<yourdomain>" : window.location.origin;
 
   const shortcutUrls = {
-    next: `${origin}/present/${sessionId}/next_slide`,
-    prev: `${origin}/present/${sessionId}/prev_slide`,
-    reset: `${origin}/present/${sessionId}/reset_slide`,
+    next: `${origin}/present/${presentationKey}/next_slide`,
+    prev: `${origin}/present/${presentationKey}/prev_slide`,
+    reset: `${origin}/present/${presentationKey}/reset_slide`,
   };
 
   return (
