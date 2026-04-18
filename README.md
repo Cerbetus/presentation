@@ -102,17 +102,17 @@ This repo includes `vercel.json` with SPA rewrites so deep links like `/present/
 3. Click **Present** to create a session and open the presenter view.
 4. Use Apple Watch / iPhone shortcut URLs with your presentation key to send commands.
 
-### Apple Watch / iPhone shortcut URLs
+### Apple Watch setup
 
 Each deck now has a stable short **presentation key** (for example `c3e3`) shown in dashboard and presenter help (`?`).  
 This key stays the same across new sessions, so you don't need to update your watch URL every time.
 
-Use your production domain:
+Use these URLs directly (no login required for watch/iPhone shortcut calls).
 
 ```
-https://<yourdomain>/present/<presentation-key>/next_slide
-https://<yourdomain>/present/<presentation-key>/prev_slide
-https://<yourdomain>/present/<presentation-key>/reset_slide
+https://presentation-ten-orpin.vercel.app/present/c7da/next_slide
+https://presentation-ten-orpin.vercel.app/present/c7da/prev_slide
+https://presentation-ten-orpin.vercel.app/present/c7da/reset_slide
 ```
 
 `reset_slide` sends the presentation to slide 1.  
@@ -120,15 +120,36 @@ Supported shortcut actions: `next_slide`, `prev_slide`, `reset_slide`.
 
 #### iOS Shortcut setup (step-by-step)
 
+1. Create 3 shortcuts on iPhone:
+  - `https://presentation-ten-orpin.vercel.app/present/c7da/next_slide`
+  - `https://presentation-ten-orpin.vercel.app/present/c7da/prev_slide`
+  - `https://presentation-ten-orpin.vercel.app/present/c7da/reset_slide`
+2. In each shortcut add: URL -> Get Contents of URL (GET).
+3. Show these shortcuts on Apple Watch.
+4. Keep presenter tab open and signed in with the same account.
+
+If you want to customize actions later, replace only the last path segment:
+
+- `next_slide`
+- `prev_slide`
+- `reset_slide`
+
+Example structure:
+
+```
+https://presentation-ten-orpin.vercel.app/present/<presentation-key>/<action>
+```
+
+Legacy steps kept for reference:
+
 1. Start presentation on Mac and click `?` in presenter to see your URLs.
 2. On iPhone, open **Shortcuts** and create shortcut **Next**.
-3. Add action **URL** with `https://<yourdomain>/present/<presentation-key>/next_slide`.
+3. Add action **URL** with one of your shortcut URLs.
 4. Add action **Get Contents of URL** (method: `GET`).
 5. Create two more shortcuts for:
    - `.../prev_slide`
    - `.../reset_slide`
 6. In Watch app (or Shortcuts on Apple Watch), enable/show these shortcuts.
-7. Keep presenter tab open and signed in with the same account.
 
 ### Keyboard shortcuts (presenter view)
 

@@ -161,11 +161,21 @@ export default function PresenterPage() {
   const Viewer = provider.SlideViewer;
   const origin =
     typeof window === "undefined" ? "https://<yourdomain>" : window.location.origin;
+  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const functionBaseUrl = supabaseUrl
+    ? `${supabaseUrl}/functions/v1/post-command`
+    : null;
 
   const shortcutUrls = {
-    next: `${origin}/present/${presentationKey}/next_slide`,
-    prev: `${origin}/present/${presentationKey}/prev_slide`,
-    reset: `${origin}/present/${presentationKey}/reset_slide`,
+    next: functionBaseUrl
+      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=next_slide`
+      : `${origin}/present/${presentationKey}/next_slide`,
+    prev: functionBaseUrl
+      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=prev_slide`
+      : `${origin}/present/${presentationKey}/prev_slide`,
+    reset: functionBaseUrl
+      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=reset_slide`
+      : `${origin}/present/${presentationKey}/reset_slide`,
   };
 
   return (
