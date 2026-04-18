@@ -1,6 +1,6 @@
 # Presentation Remote
 
-A private presentation app built with **React + Tailwind CSS** and **Supabase** (Auth, Storage, Realtime, Edge Functions). Upload your PPTX decks, create live sessions, and control slides in realtime from an Apple Watch / iPhone using large-button remote controls.
+A private presentation app built with **React + Tailwind CSS** and **Supabase** (Auth, Storage, Realtime). Upload your PPTX decks, create live sessions, and control slides in realtime from an Apple Watch / iPhone using shortcut URLs.
 
 ---
 
@@ -9,12 +9,11 @@ A private presentation app built with **React + Tailwind CSS** and **Supabase** 
 | Feature | Description |
 |---|---|
 | **Auth** | Email/password login via Supabase Auth. Only authenticated users can access the app. |
-| **Deck management** | Upload `.pptx` files to Supabase Storage. List, present, and delete your decks. |
+| **Deck management** | Upload `.pptx` files to Supabase Storage (20 MB total per user). List, present, and delete your decks. |
 | **Live sessions** | Create a presentation session for any deck. Sessions use Supabase Realtime for instant command delivery. |
-| **Presenter view** | Full-screen slide viewer that reacts to remote commands (next, prev, blank, first, last, play/pause). Keyboard shortcuts also work. |
-| **Remote control** | Large-button page optimised for Apple Watch (via iPhone relay) and iPhones. Tap to control the presenter in realtime. |
-| **Edge Function** | `post-command` endpoint for posting commands securely with auth verification. Useful for iOS Shortcuts or external integrations. |
-| **RLS** | Strict Row Level Security — users only see and control their own decks, sessions, and commands. |
+| **Presenter view** | Slide viewer that reacts to remote commands (`next`, `prev`, `reset`) and keyboard shortcuts. |
+| **Shortcut URL control** | Trigger next/prev/reset using a tiny stable presentation key (no per-session URL updates). |
+| **RLS** | Strict Row Level Security — users only see and control their own decks, sessions, and storage objects. |
 | **Provider abstraction** | Pluggable rendering providers. MVP ships with a basic placeholder renderer; extension points for Microsoft 365 embed and third-party render APIs. |
 
 ---
@@ -51,25 +50,30 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>
 
 You can find these values in **Supabase Dashboard → Settings → API**.
 
+### 2.1 Supabase Auth URL configuration (required for email confirmation)
+
+In **Supabase Dashboard → Authentication → URL Configuration**:
+
+- Set **Site URL** to your app URL (for local dev: `http://localhost:5173`)
+- Add these **Redirect URLs**:
+  - `http://localhost:5173/login`
+  - Your production login URL (for example `https://your-domain.com/login`)
+
+Without this, confirmation links may fail or not complete correctly.
+
 ### 3. Database setup
 
-Run the SQL migration in your Supabase project:
+Run the SQL migrations in your Supabase project:
 
 1. Open **Supabase Dashboard → SQL Editor**.
-2. Paste the contents of `supabase/migrations/20240101000000_init.sql`.
-3. Click **Run**.
+2. Run `supabase/migrations/20240101000000_init.sql`.
+3. Run `supabase/migrations/20260418125000_storage_limit_20mb.sql`.
+4. Run `supabase/migrations/20260418130500_drop_sessions_is_active.sql`.
+5. Run `supabase/migrations/20260418131000_drop_commands_table.sql`.
 
-This creates the `decks`, `sessions`, and `commands` tables with RLS policies, and a private `decks` storage bucket.
+This creates the `decks` and `sessions` tables with RLS policies, removes old unused fields/tables, provides a private `decks` storage bucket, and enforces a 20 MB per-user storage limit.
 
-### 4. Deploy the Edge Function (optional)
-
-If you want the `post-command` Edge Function (useful for iOS Shortcuts / external API calls):
-
-```bash
-npx supabase functions deploy post-command --project-ref <your-project-ref>
-```
-
-### 5. Run locally
+### 4. Run locally
 
 ```bash
 npm run dev
@@ -77,7 +81,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). You will be redirected to the login page.
 
-### 6. Build for production
+### 5. Build for production
 
 ```bash
 npm run build
@@ -85,6 +89,7 @@ npm run preview   # preview the production build locally
 ```
 
 Deploy the `dist/` folder to any static host (Vercel, Netlify, Cloudflare Pages, etc.).
+This repo includes `vercel.json` with SPA rewrites so deep links like `/present/<key>/next_slide` work on Vercel.
 
 ---
 
@@ -95,31 +100,35 @@ Deploy the `dist/` folder to any static host (Vercel, Netlify, Cloudflare Pages,
 1. **Sign in** with email + password.
 2. **Upload a PPTX** from the dashboard.
 3. Click **Present** to create a session and open the presenter view.
-4. Click **Open Remote ↗** (link in presenter header) to open the remote control in a new tab or on your phone.
-5. **Tap buttons** on the remote to control slides in realtime.
+4. Use Apple Watch / iPhone shortcut URLs with your presentation key to send commands.
 
-### Apple Watch / iPhone remote
+### Apple Watch / iPhone shortcut URLs
 
-The remote page (`/remote/:sessionId`) is designed with large tap targets that work well on small screens:
+Each deck now has a stable short **presentation key** (for example `c3e3`) shown in dashboard and presenter help (`?`).  
+This key stays the same across new sessions, so you don't need to update your watch URL every time.
 
-1. Open the remote URL on your **iPhone** (Safari).
-2. The page works fullscreen — **Add to Home Screen** for an app-like experience.
-3. On **Apple Watch**, use an iOS Shortcut that opens the remote URL, or use the Shortcuts app to POST to the Edge Function endpoint.
-
-#### iOS Shortcuts integration (advanced)
-
-Create a Shortcut on your iPhone/Watch that calls the Edge Function:
+Use your production domain:
 
 ```
-POST https://<project>.supabase.co/functions/v1/post-command
-Headers:
-  Authorization: Bearer <your-access-token>
-  Content-Type: application/json
-Body:
-  { "session_id": "<uuid>", "type": "next" }
+https://<yourdomain>/present/<presentation-key>/next_slide
+https://<yourdomain>/present/<presentation-key>/prev_slide
+https://<yourdomain>/present/<presentation-key>/reset_slide
 ```
 
-Command types: `next`, `prev`, `first`, `last`, `blank`, `playpause`, `goto` (with `"slide": N`).
+`reset_slide` sends the presentation to slide 1.  
+Supported shortcut actions: `next_slide`, `prev_slide`, `reset_slide`.
+
+#### iOS Shortcut setup (step-by-step)
+
+1. Start presentation on Mac and click `?` in presenter to see your URLs.
+2. On iPhone, open **Shortcuts** and create shortcut **Next**.
+3. Add action **URL** with `https://<yourdomain>/present/<presentation-key>/next_slide`.
+4. Add action **Get Contents of URL** (method: `GET`).
+5. Create two more shortcuts for:
+   - `.../prev_slide`
+   - `.../reset_slide`
+6. In Watch app (or Shortcuts on Apple Watch), enable/show these shortcuts.
+7. Keep presenter tab open and signed in with the same account.
 
 ### Keyboard shortcuts (presenter view)
 
@@ -127,7 +136,6 @@ Command types: `next`, `prev`, `first`, `last`, `blank`, `playpause`, `goto` (wi
 |---|---|
 | → / Space | Next slide |
 | ← | Previous slide |
-| B | Toggle blank screen |
 | Home | First slide |
 | End | Last slide |
 
@@ -137,33 +145,25 @@ Command types: `next`, `prev`, `first`, `last`, `blank`, `playpause`, `goto` (wi
 
 ### ⚠️ Important
 
-The MVP ships with a **basic placeholder renderer** (`BasicProvider`) that shows slide numbers and a download link. It does **not** render actual slide content, animations, transitions, or embedded video.
+The app now uses **Microsoft Office Online embed** (`Office365Provider`) as the active renderer.
 
 ### Why?
 
-Faithful PPTX rendering in a browser is a hard problem. Most open-source JS libraries lose animations, transitions, SmartArt, and video. The reliable solutions are:
+Faithful PPTX rendering in a browser is a hard problem. Office embed gives high fidelity for animations, transitions, SmartArt, and embedded media.
 
-1. **Microsoft 365 / Office Online embed** — upload to OneDrive, embed via iframe. Best fidelity.
-2. **Third-party render API** (Aspose, GroupDocs, iSpring) — server-side conversion to HTML5/video.
-3. **Server-side video rendering** — convert to video with animations baked in.
+### Limitation
 
-### Provider architecture
+Office embed runs in a **cross-origin iframe**. Because of browser security rules, the parent app cannot call internal Office DOM controls directly. Slide changes are done by updating the Office embed URL, which may still trigger heavy reload behavior from Microsoft’s side.
 
-The app uses a provider abstraction (`src/providers/`):
+### Renderer architecture
+
+The renderer used by the app is:
 
 ```
 src/providers/
-  index.js              ← Provider registry (ordered by preference)
-  BasicProvider.jsx     ← MVP fallback (placeholder)
-  Office365Provider.jsx ← Extension point for MS 365 embed
-  ThirdPartyProvider.jsx← Extension point for render API
+  index.js              ← Office renderer registry
+  Office365Provider.jsx ← Active PPTX renderer
 ```
-
-To add a new provider:
-
-1. Create a file in `src/providers/` exporting `{ name, canRender(file), SlideViewer }`.
-2. `SlideViewer` receives `{ fileUrl, currentSlide, totalSlides, onTotalSlidesKnown }`.
-3. Register it in `src/providers/index.js` (higher priority = earlier in the array).
 
 ---
 
@@ -179,7 +179,8 @@ To add a new provider:
 │   ├── index.css                # Tailwind import
 │   ├── App.jsx                  # Router + auth wrapper
 │   ├── lib/
-│   │   └── supabase.js          # Supabase client
+│   │   ├── supabase.js          # Supabase client
+│   │   └── presentationKey.js   # Stable presentation key helper
 │   ├── hooks/
 │   │   ├── useAuth.jsx          # Auth context + hook
 │   │   └── useRealtimeCommands.js # Realtime channel hook
@@ -189,19 +190,17 @@ To add a new provider:
 │   │   ├── LoginPage.jsx        # Login / signup form
 │   │   ├── DashboardPage.jsx    # Deck list + upload + session creation
 │   │   ├── PresenterPage.jsx    # Live slide viewer
-│   │   └── RemotePage.jsx       # Large-button remote control
+│   │   └── ShortcutCommandPage.jsx # URL-triggered shortcut commands
 │   └── providers/
-│       ├── index.js             # Provider registry
-│       ├── BasicProvider.jsx    # MVP placeholder renderer
-│       ├── Office365Provider.jsx# MS 365 extension point
-│       └── ThirdPartyProvider.jsx# 3rd-party extension point
+│       ├── index.js             # Office renderer registry
+│       └── Office365Provider.jsx# Active PPTX renderer
 ├── supabase/
 │   ├── config.toml
-│   ├── migrations/
-│   │   └── 20240101000000_init.sql  # Tables, RLS, storage bucket
-│   └── functions/
-│       └── post-command/
-│           └── index.ts         # Edge Function for commands
+│   └── migrations/
+│       ├── 20240101000000_init.sql           # Tables, RLS, storage bucket
+│       ├── 20260418125000_storage_limit_20mb.sql # 20 MB per-user storage quota
+│       ├── 20260418130500_drop_sessions_is_active.sql # Remove unused sessions.is_active field
+│       └── 20260418131000_drop_commands_table.sql # Remove unused commands table
 └── README.md
 ```
 
@@ -213,9 +212,6 @@ To add a new provider:
 |---|---|---|
 | `VITE_SUPABASE_URL` | ✅ | Your Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | ✅ | Your Supabase anon/public key |
-| `VITE_MS_CLIENT_ID` | ❌ | Azure AD client ID (for Office365Provider) |
-| `VITE_MS_TENANT_ID` | ❌ | Azure AD tenant ID (for Office365Provider) |
-| `VITE_RENDER_API_KEY` | ❌ | API key for third-party render service |
 
 ---
 

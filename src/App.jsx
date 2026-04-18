@@ -4,7 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import PresenterPage from "./pages/PresenterPage";
-import RemotePage from "./pages/RemotePage";
+import ShortcutCommandPage from "./pages/ShortcutCommandPage";
 
 function RedirectIfAuth({ children }) {
   const session = useSession();
@@ -43,10 +43,10 @@ export default function App() {
             }
           />
           <Route
-            path="/remote/:sessionId"
+            path="/present/:presentationKey/:shortcutAction"
             element={
               <ProtectedRoute>
-                <RemotePage />
+                <ShortcutCommandPage />
               </ProtectedRoute>
             }
           />
