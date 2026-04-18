@@ -44,11 +44,7 @@ export default function App() {
           />
           <Route
             path="/present/:presentationKey/:shortcutAction"
-            element={
-              <ProtectedRoute>
-                <ShortcutCommandPage />
-              </ProtectedRoute>
-            }
+            element={<ShortcutCommandPage />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

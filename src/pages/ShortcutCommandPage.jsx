@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { buildPresentationKey, isUuidLike } from "../lib/presentationKey";
+import { isUuidLike } from "../lib/presentationKey";
 
 const ACTION_TO_COMMAND = {
   next_slide: "next",
@@ -44,40 +44,15 @@ export default function ShortcutCommandPage() {
     const normalizedKey = presentationKey.trim().toLowerCase();
 
     (async () => {
-      let resolvedSessionId = normalizedKey;
-
       if (!isUuidLike(normalizedKey)) {
-        const { data, error: queryError } = await supabase
-          .from("sessions")
-          .select("id, created_at, deck_id, decks(id, name)")
-          .order("created_at", { ascending: false });
-
-        if (disposed) return;
-
-        if (queryError) {
-          setError(queryError.message);
-          setStatus(null);
-          return;
-        }
-
-        const matchingSession = (data ?? []).find((session) => {
-          const deckName = Array.isArray(session.decks)
-            ? session.decks[0]?.name
-            : session.decks?.name;
-          const key = buildPresentationKey(deckName, session.deck_id);
-          return key === normalizedKey;
-        });
-
-        if (!matchingSession) {
-          setError(
-            "No active session for this presentation key. Start the presentation first."
-          );
-          setStatus(null);
-          return;
-        }
-
-        resolvedSessionId = matchingSession.id;
+        setError(
+          "Invalid or expired shortcut URL. Open Presenter and copy the latest session shortcut URLs."
+        );
+        setStatus(null);
+        return;
       }
+
+      const resolvedSessionId = normalizedKey;
 
       const channel = supabase.channel(`session:${resolvedSessionId}`);
       activeChannel = channel;
@@ -139,7 +114,7 @@ export default function ShortcutCommandPage() {
       <div className="text-center space-y-4">
         <p className="text-gray-200">{status}</p>
         <p className="text-xs text-gray-500">
-          Key: <span className="text-gray-300">{presentationKey}</span>
+          Session: <span className="text-gray-300">{presentationKey}</span>
         </p>
       </div>
     </div>

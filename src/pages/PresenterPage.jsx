@@ -3,7 +3,6 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useRealtimeCommands } from "../hooks/useRealtimeCommands";
 import { getProvider } from "../providers";
-import { buildPresentationKey } from "../lib/presentationKey";
 
 const COMMAND_LABELS = {
   next: "Next slide",
@@ -155,14 +154,13 @@ export default function PresenterPage() {
 
   const provider = getProvider();
   const Viewer = provider.SlideViewer;
-  const presentationKey = buildPresentationKey(deck.name, deck.id);
   const origin =
     typeof window === "undefined" ? "https://<yourdomain>" : window.location.origin;
 
   const shortcutUrls = {
-    next: `${origin}/present/${presentationKey}/next_slide`,
-    prev: `${origin}/present/${presentationKey}/prev_slide`,
-    reset: `${origin}/present/${presentationKey}/reset_slide`,
+    next: `${origin}/present/${sessionId}/next_slide`,
+    prev: `${origin}/present/${sessionId}/prev_slide`,
+    reset: `${origin}/present/${sessionId}/reset_slide`,
   };
 
   return (
@@ -196,7 +194,7 @@ export default function PresenterPage() {
             <div className="absolute right-4 top-11 w-[28rem] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-700 bg-gray-900 p-4 shadow-2xl z-40 text-xs">
               <p className="text-gray-200 font-semibold mb-2">Apple Watch setup</p>
               <p className="text-gray-400 mb-3">
-                Use this short key: <span className="text-white">{presentationKey}</span>
+                Use these URLs directly (no login required for watch/iPhone shortcut calls).
               </p>
               <p className="text-gray-400 mb-1">1. Create 3 shortcuts on iPhone:</p>
               <code className="block text-blue-300 mb-1 break-all">{shortcutUrls.next}</code>
