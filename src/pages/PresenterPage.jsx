@@ -209,18 +209,13 @@ export default function PresenterPage() {
             <div className="absolute right-4 top-11 w-[28rem] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-700 bg-gray-900 p-4 shadow-2xl z-40 text-xs">
               <p className="text-gray-200 font-semibold mb-2">Apple Watch setup</p>
               <p className="text-gray-400 mb-3">
-                Use these URLs directly (no login required for watch/iPhone shortcut calls).
+                Use one presentation key for the whole talk. The same key works for next, previous, and reset.
               </p>
-              <p className="text-gray-400 mb-1">1. Create 3 shortcuts on iPhone:</p>
-              <code className="block text-blue-300 mb-1 break-all">{shortcutUrls.next}</code>
-              <code className="block text-blue-300 mb-1 break-all">{shortcutUrls.prev}</code>
-              <code className="block text-blue-300 mb-3 break-all">{shortcutUrls.reset}</code>
-              <p className="text-gray-400 mb-2">
-                2. In each shortcut add: URL → Get Contents of URL (GET).
-              </p>
-              <p className="text-gray-400">
-                3. Show these shortcuts on Apple Watch.
-              </p>
+              <p className="text-gray-400 mb-3">Use these URLs on Apple Watch or iPhone shortcuts:</p>
+              <code className="block text-blue-300 mb-1 break-all">Next: {shortcutUrls.next}</code>
+              <code className="block text-blue-300 mb-1 break-all">Previous: {shortcutUrls.prev}</code>
+              <code className="block text-blue-300 mb-3 break-all">Reset: {shortcutUrls.reset}</code>
+              <p className="text-gray-400">No separate watch sign-in page is needed.</p>
             </div>
           )}
         </header>
