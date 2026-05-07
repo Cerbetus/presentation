@@ -36,6 +36,7 @@ function SlideViewer({
   totalSlides,
   onTotalSlidesKnown,
   fullscreen = false,
+  fullscreenTargetRef,
 }) {
   const [syncedSlide, setSyncedSlide] = useState(currentSlide);
   const [frameUrls, setFrameUrls] = useState([null, null]);
@@ -111,6 +112,12 @@ function SlideViewer({
   useEffect(() => {
     visibleFrameRef.current = visibleFrame;
   }, [visibleFrame]);
+
+  useEffect(() => {
+    if (!fullscreenTargetRef) return;
+    fullscreenTargetRef.current =
+      iframeRefs.current[visibleFrameRef.current] ?? null;
+  }, [fullscreenTargetRef, visibleFrame]);
 
   useEffect(() => {
     return () => {
@@ -205,6 +212,9 @@ function SlideViewer({
             src={url}
             ref={(node) => {
               iframeRefs.current[index] = node;
+              if (fullscreenTargetRef && index === visibleFrameRef.current) {
+                fullscreenTargetRef.current = node;
+              }
             }}
             className={`absolute inset-0 w-full h-full border-0 transition-opacity duration-150 ${
               isVisible ? "opacity-100" : "opacity-0"
@@ -215,6 +225,7 @@ function SlideViewer({
             }}
             onLoad={() => handleFrameLoad(index)}
             allowFullScreen
+            allow="fullscreen"
           />
         );
       })}

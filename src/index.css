@@ -1,2 +1,294 @@
 @import "tailwindcss";
 
+:root {
+	--bg-1: #06080d;
+	--bg-2: #0b111a;
+	--bg-3: #0f1824;
+	--ink: #f2f6fb;
+	--muted: #a7b3c4;
+	--accent: #66ddff;
+	--accent-strong: #1ea4ff;
+	--accent-soft: rgba(102, 221, 255, 0.2);
+	--glass: rgba(255, 255, 255, 0.08);
+	--glass-strong: rgba(255, 255, 255, 0.16);
+	--stroke: rgba(255, 255, 255, 0.18);
+	--shadow: 0 25px 80px rgba(3, 10, 20, 0.55);
+	--font-sans: "Sora", "Segoe UI", sans-serif;
+	--font-display: "Space Grotesk", "Sora", sans-serif;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	background: radial-gradient(1200px 800px at 80% 10%, rgba(102, 221, 255, 0.15), transparent 60%),
+		radial-gradient(900px 700px at 10% 20%, rgba(255, 255, 255, 0.08), transparent 55%),
+		linear-gradient(135deg, var(--bg-1), var(--bg-2) 40%, var(--bg-3));
+	color: var(--ink);
+	font-family: var(--font-sans);
+	letter-spacing: 0.01em;
+}
+
+body::before {
+	content: "";
+	position: fixed;
+	inset: -20% -10% 0 -10%;
+	background: radial-gradient(500px 400px at 20% 80%, rgba(102, 221, 255, 0.18), transparent 60%),
+		radial-gradient(600px 460px at 85% 70%, rgba(255, 255, 255, 0.12), transparent 65%);
+	filter: blur(10px);
+	pointer-events: none;
+	z-index: -2;
+}
+
+body::after {
+	content: "";
+	position: fixed;
+	inset: 0;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+	opacity: 0.25;
+	pointer-events: none;
+	z-index: -1;
+}
+
+a {
+	color: inherit;
+}
+
+.app-shell {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	position: relative;
+	overflow-x: hidden;
+}
+
+.app-shell:fullscreen,
+.app-shell:-webkit-full-screen,
+.app-shell:-moz-full-screen,
+.app-shell:-ms-fullscreen {
+	width: 100%;
+	height: 100%;
+}
+
+.app-shell > main {
+	flex: 1 0 auto;
+}
+
+.app-nav {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20px 28px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(14px);
+}
+
+.brand {
+	font-family: var(--font-display);
+	font-size: 1.1rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.nav-links {
+	display: flex;
+	gap: 16px;
+	font-size: 0.9rem;
+	color: var(--muted);
+}
+
+.nav-links a {
+	transition: color 0.2s ease;
+}
+
+.nav-links a:hover {
+	color: var(--ink);
+}
+
+.glass-card {
+	position: relative;
+	border-radius: 26px;
+	background: var(--glass);
+	border: 1px solid var(--stroke);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px);
+	overflow: hidden;
+}
+
+.glass-card::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(140deg, rgba(255, 255, 255, 0.2), transparent 45%);
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+.glass-panel {
+	border-radius: 20px;
+	background: rgba(10, 16, 24, 0.65);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 18px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--ink);
+	font-weight: 500;
+	transition: transform 0.2s ease, background 0.2s ease, border 0.2s ease;
+}
+
+.glass-button:hover {
+	transform: translateY(-1px);
+	background: rgba(255, 255, 255, 0.14);
+	border-color: rgba(255, 255, 255, 0.32);
+}
+
+.glass-button-primary {
+	background: linear-gradient(135deg, rgba(102, 221, 255, 0.28), rgba(30, 164, 255, 0.35));
+	border: 1px solid rgba(102, 221, 255, 0.4);
+	color: #041019;
+	font-weight: 600;
+}
+
+.glass-button-primary:hover {
+	background: linear-gradient(135deg, rgba(102, 221, 255, 0.42), rgba(30, 164, 255, 0.5));
+}
+
+.glass-button-ghost {
+	background: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	color: var(--muted);
+}
+
+.glass-input {
+	width: 100%;
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	background: rgba(7, 12, 18, 0.7);
+	color: var(--ink);
+	padding: 12px 14px;
+	outline: none;
+	transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-input:focus {
+	border-color: rgba(102, 221, 255, 0.5);
+	box-shadow: 0 0 0 3px rgba(102, 221, 255, 0.12);
+}
+
+.display-title {
+	font-family: var(--font-display);
+	font-size: clamp(2.4rem, 4vw, 4rem);
+	line-height: 1.05;
+	letter-spacing: 0.02em;
+}
+
+.section-title {
+	font-family: var(--font-display);
+	font-size: 1.4rem;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.glass-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: 999px;
+	padding: 6px 12px;
+	border: 1px solid rgba(102, 221, 255, 0.35);
+	background: rgba(102, 221, 255, 0.12);
+	font-size: 0.78rem;
+	text-transform: uppercase;
+	letter-spacing: 0.2em;
+}
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 6px 12px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.liquid-ring {
+	width: 140px;
+	height: 140px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%),
+		conic-gradient(from 120deg, rgba(102, 221, 255, 0.6), rgba(30, 164, 255, 0.15), rgba(102, 221, 255, 0.6));
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: inset 0 0 30px rgba(102, 221, 255, 0.2);
+}
+
+.app-footer {
+	margin-top: 32px;
+	padding: 24px 28px 32px;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(14px);
+}
+
+.app-footer-inner {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px 20px;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.fade-in {
+	animation: fadeInUp 0.8s ease both;
+}
+
+.stagger > * {
+	animation: fadeInUp 0.8s ease both;
+}
+
+.stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger > *:nth-child(4) { animation-delay: 0.24s; }
+.stagger > *:nth-child(5) { animation-delay: 0.32s; }
+
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fade-in,
+	.stagger > * {
+		animation: none;
+	}
+}
+

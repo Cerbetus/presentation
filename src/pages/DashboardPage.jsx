@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useSession } from "../hooks/useAuth";
-import { buildPresentationKey } from "../lib/presentationKey";
+import { buildAccountKey } from "../lib/presentationKey";
+import Footer from "../components/Footer";
 
 const MAX_USER_STORAGE_BYTES = 20 * 1024 * 1024;
 
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const userId = session?.user?.id;
+  const accountKey = buildAccountKey(userId);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -169,84 +171,124 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-        <h1 className="text-xl font-bold">My Decks</h1>
-        <button
-          onClick={handleSignOut}
-          className="text-sm text-gray-400 hover:text-white transition"
-        >
+    <div className="app-shell">
+      <header className="app-nav">
+        <Link to="/" className="brand">
+          Presentation Remote
+        </Link>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/control">Control</Link>
+          <Link to="/settings/control">Control Settings</Link>
+        </div>
+        <button onClick={handleSignOut} className="glass-button glass-button-ghost">
           Sign out
         </button>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+        <div className="space-y-2">
+          <p className="glass-badge">Dashboard</p>
+          <h1 className="display-title">Your decks, always ready.</h1>
+          <p className="muted max-w-2xl">
+            Upload, present, and stay connected on any device with one account key.
+          </p>
+        </div>
+
         {error && (
-          <div className="bg-red-900/60 text-red-200 text-sm rounded-lg px-4 py-2">
+          <div className="rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
             {error}
           </div>
         )}
 
-        {/* Upload */}
-        <label className="flex items-center justify-center gap-3 bg-gray-900 border-2 border-dashed border-gray-700 rounded-xl p-6 cursor-pointer hover:border-blue-500 transition">
-          <span className="text-gray-400">
-            {uploading ? "Uploading…" : "Upload PPTX"}
-          </span>
-          <input
-            type="file"
-            accept=".pptx"
-            className="hidden"
-            onChange={handleUpload}
-            disabled={uploading}
-          />
-        </label>
-        <p className="text-xs text-gray-500 text-center">
-          Storage used: {formatBytes(usedBytes)} / {formatBytes(MAX_USER_STORAGE_BYTES)}
-        </p>
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="glass-card p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="section-title">Deck library</h2>
+              <span className="pill">{decks.length} decks</span>
+            </div>
 
-        {/* Deck list */}
-        {decks.length === 0 && (
-          <p className="text-gray-500 text-center">
-            No decks yet. Upload a PPTX to get started.
-          </p>
-        )}
-
-        <ul className="space-y-3">
-          {decks.map((deck) => (
-            <li
-              key={deck.id}
-              className="bg-gray-900 rounded-xl p-4 flex items-center justify-between"
-            >
+            <label className="glass-panel flex items-center justify-between gap-3 p-4 cursor-pointer hover:border-sky-300/40 transition">
               <div>
-                <p className="font-medium">{deck.name}</p>
-                <p className="text-xs text-gray-500">
-                  {deck.slide_count} slides •{" "}
-                  {new Date(deck.created_at).toLocaleDateString()}
-                </p>
-                <p className="text-xs text-gray-500">
-                  Key: {buildPresentationKey(deck.name, deck.id)}
-                </p>
+                <p className="font-medium">{uploading ? "Uploading…" : "Upload PPTX"}</p>
+                <p className="text-xs muted">Max 20 MB per account</p>
               </div>
+              <span className="glass-button glass-button-primary text-sm">Browse</span>
+              <input
+                type="file"
+                accept=".pptx"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleCreateSession(deck)}
-                  className="bg-blue-600 hover:bg-blue-700 text-sm px-4 py-2 rounded-lg transition"
-                >
-                  Present
-                </button>
-                <button
-                  onClick={() => handleDelete(deck)}
-                  className="bg-red-700 hover:bg-red-800 text-sm px-4 py-2 rounded-lg transition"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+            <p className="text-xs muted">
+              Storage used: {formatBytes(usedBytes)} / {formatBytes(MAX_USER_STORAGE_BYTES)}
+            </p>
+
+            {decks.length === 0 && (
+              <p className="muted">No decks yet. Upload a PPTX to get started.</p>
+            )}
+
+            <ul className="space-y-3">
+              {decks.map((deck) => (
+                <li key={deck.id} className="glass-panel p-4 flex flex-col gap-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">{deck.name}</p>
+                    <p className="text-xs muted">
+                      {deck.slide_count} slides • {new Date(deck.created_at).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs muted">Account key applies to every deck.</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleCreateSession(deck)}
+                      className="glass-button glass-button-primary text-sm"
+                    >
+                      Present
+                    </button>
+                    <button
+                      onClick={() => handleDelete(deck)}
+                      className="glass-button text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <aside className="glass-card p-6 space-y-5">
+            <div>
+              <h2 className="section-title">Remote control</h2>
+              <p className="muted text-sm">
+                Sign in once on your phone or tablet and it will stay connected to whatever you present.
+              </p>
+            </div>
+
+            <div className="glass-panel p-4 space-y-2">
+              <p className="text-xs muted">Account key</p>
+              <p className="text-lg font-semibold tracking-[0.2em]">{accountKey}</p>
+              <p className="text-xs muted">
+                Use this key for account-wide shortcut URLs if you still prefer shortcuts.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Link to="/control" className="glass-button glass-button-primary">
+                Open Control
+              </Link>
+              <Link to="/settings/control" className="glass-button">
+                Control setup
+              </Link>
+            </div>
+          </aside>
+        </div>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -1,11 +1,33 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import Footer from "../components/Footer";
+
+const SIGNUP_COOLDOWN_MS = 60_000;
+const RESET_COOLDOWN_MS = 60_000;
+const SIGNUP_COOLDOWN_KEY = "authSignupCooldown";
+const RESET_COOLDOWN_KEY = "authResetCooldown";
+
+function getCooldownRemaining(key, durationMs) {
+  if (typeof window === "undefined") return 0;
+  const raw = window.localStorage.getItem(key);
+  const lastTs = Number(raw);
+  if (!Number.isFinite(lastTs)) return 0;
+  const remaining = durationMs - (Date.now() - lastTs);
+  return remaining > 0 ? remaining : 0;
+}
+
+function startCooldown(key) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, String(Date.now()));
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [showResendConfirmation, setShowResendConfirmation] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -28,6 +50,20 @@ export default function LoginPage() {
     setNotice(null);
     setShowResendConfirmation(false);
     setLoading(true);
+
+    if (mode === "signup") {
+      const remaining = getCooldownRemaining(
+        SIGNUP_COOLDOWN_KEY,
+        SIGNUP_COOLDOWN_MS
+      );
+      if (remaining > 0) {
+        setError(
+          `Please wait ${Math.ceil(remaining / 1000)} seconds before requesting another signup email.`
+        );
+        setLoading(false);
+        return;
+      }
+    }
 
     const { data, error: err } =
       mode === "login"
@@ -56,6 +92,7 @@ export default function LoginPage() {
       setNotice(
         "Confirmation email sent. Check your inbox and click the link to finish your signup."
       );
+      startCooldown(SIGNUP_COOLDOWN_KEY);
     }
 
     setLoading(false);
@@ -88,78 +125,146 @@ export default function LoginPage() {
     setResending(false);
   }
 
+  async function handlePasswordReset() {
+    if (!email) {
+      setError("Enter your email first so we can send a reset link.");
+      return;
+    }
+
+    const remaining = getCooldownRemaining(
+      RESET_COOLDOWN_KEY,
+      RESET_COOLDOWN_MS
+    );
+    if (remaining > 0) {
+      setError(
+        `Please wait ${Math.ceil(remaining / 1000)} seconds before requesting another reset email.`
+      );
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setShowResendConfirmation(false);
+    setResetting(true);
+
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+
+    if (err) {
+      setError(err.message);
+    } else {
+      setNotice("Password reset email sent. Check your inbox.");
+      startCooldown(RESET_COOLDOWN_KEY);
+    }
+
+    setResetting(false);
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm bg-gray-900 rounded-2xl p-8 shadow-xl space-y-5"
-      >
-        <h1 className="text-2xl font-bold text-center text-white">
-          {mode === "login" ? "Sign In" : "Create Account"}
-        </h1>
+    <div className="app-shell">
+      <header className="app-nav">
+        <Link to="/" className="brand">
+          Presentation Remote
+        </Link>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/dashboard">Dashboard</Link>
+        </div>
+      </header>
 
-        {error && (
-          <div className="bg-red-900/60 text-red-200 text-sm rounded-lg px-4 py-2">
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div className="bg-blue-900/40 text-blue-100 text-sm rounded-lg px-4 py-2">
-            {notice}
-          </div>
-        )}
-
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg bg-gray-800 border border-gray-700 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg bg-gray-800 border border-gray-700 px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition"
+      <main className="flex items-center justify-center px-6 py-16">
+        <form
+          onSubmit={handleSubmit}
+          className="glass-card w-full max-w-md p-8 space-y-6"
         >
-          {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Sign Up"}
-        </button>
+          <div className="space-y-2 text-center">
+            <div className="glass-badge">Secure Access</div>
+            <h1 className="section-title">
+              {mode === "login" ? "Sign In" : "Create Account"}
+            </h1>
+            <p className="muted text-sm">
+              One account powers your Mac, phone, and tablet controls.
+            </p>
+          </div>
 
-        {showResendConfirmation && (
-          <button
-            type="button"
-            onClick={handleResendConfirmation}
-            disabled={resending || !email}
-            className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-100 font-medium py-3 rounded-lg transition"
-          >
-            {resending ? "Resending…" : "Resend confirmation email"}
-          </button>
-        )}
+          {error && (
+            <div className="rounded-xl border border-red-400/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
+              {error}
+            </div>
+          )}
+          {notice && (
+            <div className="rounded-xl border border-sky-300/30 bg-sky-400/15 px-4 py-3 text-sm text-sky-100">
+              {notice}
+            </div>
+          )}
 
-        <p className="text-center text-sm text-gray-400">
-          {mode === "login" ? "No account? " : "Already have an account? "}
+          <div className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="glass-input"
+            />
+
+            <input
+              type="password"
+              placeholder="Password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="glass-input"
+            />
+          </div>
+
           <button
-            type="button"
-            onClick={() => {
-              setMode(mode === "login" ? "signup" : "login");
-              setShowResendConfirmation(false);
-            }}
-            className="text-blue-400 hover:underline"
+            type="submit"
+            disabled={loading}
+            className="glass-button glass-button-primary w-full disabled:opacity-60"
           >
-            {mode === "login" ? "Sign up" : "Sign in"}
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Sign Up"}
           </button>
-        </p>
-      </form>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handlePasswordReset}
+              disabled={resetting || !email}
+              className="text-xs text-sky-200 hover:text-white transition disabled:opacity-50"
+            >
+              {resetting ? "Sending reset..." : "Forgot password?"}
+            </button>
+          </div>
+
+          {showResendConfirmation && (
+            <button
+              type="button"
+              onClick={handleResendConfirmation}
+              disabled={resending || !email}
+              className="glass-button glass-button-ghost w-full disabled:opacity-60"
+            >
+              {resending ? "Resending..." : "Resend confirmation email"}
+            </button>
+          )}
+
+          <p className="text-center text-sm muted">
+            {mode === "login" ? "No account? " : "Already have an account? "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "login" ? "signup" : "login");
+                setShowResendConfirmation(false);
+              }}
+              className="text-sky-200 hover:text-white transition"
+            >
+              {mode === "login" ? "Sign up" : "Sign in"}
+            </button>
+          </p>
+        </form>
+      </main>
+      <Footer />
     </div>
   );
 }

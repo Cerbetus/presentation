@@ -1,6 +1,6 @@
 # Presentation Remote
 
-A private presentation app built with **React + Tailwind CSS** and **Supabase** (Auth, Storage, Realtime). Upload your PPTX decks, create live sessions, and control slides in realtime from an Apple Watch / iPhone using shortcut URLs.
+A private presentation app built with **React + Tailwind CSS** and **Supabase** (Auth, Storage, Realtime). Upload your PPTX decks, create live sessions, and control slides in realtime from any phone or tablet. Sign in on /control once and keep a single account key for every deck.
 
 ---
 
@@ -12,7 +12,8 @@ A private presentation app built with **React + Tailwind CSS** and **Supabase** 
 | **Deck management** | Upload `.pptx` files to Supabase Storage (20 MB total per user). List, present, and delete your decks. |
 | **Live sessions** | Create a presentation session for any deck. Sessions use Supabase Realtime for instant command delivery. |
 | **Presenter view** | Slide viewer that reacts to remote commands (`next`, `prev`, `reset`) and keyboard shortcuts. |
-| **Shortcut URL control** | Trigger next/prev/reset using a tiny stable presentation key (no per-session URL updates). |
+| **Control sign-in** | Open `/control` once on a phone or tablet and stay connected with live slide status. |
+| **Account-wide key** | A single key works across every deck. |
 | **RLS** | Strict Row Level Security — users only see and control their own decks, sessions, and storage objects. |
 | **Provider abstraction** | Pluggable rendering providers. MVP ships with a basic placeholder renderer; extension points for Microsoft 365 embed and third-party render APIs. |
 
@@ -71,7 +72,7 @@ Run the SQL migrations in your Supabase project:
 4. Run `supabase/migrations/20260418130500_drop_sessions_is_active.sql`.
 5. Run `supabase/migrations/20260418131000_drop_commands_table.sql`.
 
-This creates the `decks` and `sessions` tables with RLS policies, removes old unused fields/tables, provides a private `decks` storage bucket, and enforces a 20 MB per-user storage limit.
+This creates the `decks` and `sessions` tables with RLS policies, removes old unused fields/tables, provides a private `decks` storage bucket, and enforces a 20 MB per-user storage limit. No additional migrations are required for `/control`.
 
 ### 4. Run locally
 
@@ -79,7 +80,7 @@ This creates the `decks` and `sessions` tables with RLS policies, removes old un
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). You will be redirected to the login page.
+Open [http://localhost:5173](http://localhost:5173). Use the home page CTA or visit `/login` to sign in.
 
 ### 5. Build for production
 
@@ -98,58 +99,30 @@ This repo includes `vercel.json` with SPA rewrites so deep links like `/present/
 ### Flow
 
 1. **Sign in** with email + password.
-2. **Upload a PPTX** from the dashboard.
+2. **Upload a PPTX** from the dashboard (`/dashboard`).
 3. Click **Present** to create a session and open the presenter view.
-4. Use Apple Watch / iPhone shortcut URLs with your presentation key to send commands.
+4. Open `/control` on a phone or tablet and sign in once to stay synced.
 
-### Apple Watch setup
+### Remote control setup
 
-Each deck now has a stable short **presentation key** (for example `c3e3`) shown in dashboard and presenter help (`?`).  
-This key stays the same across new sessions, so you don't need to update your watch URL every time.
+Open `/control` on your phone or tablet and sign in once with the same account as your presenter.  
+The device stays connected and shows the current slide.
 
-Use these URLs directly (no login required for watch/iPhone shortcut calls).
+Control Settings live at `/settings/control` if you want to copy the account key or shortcut URLs.
+
+#### Account-wide shortcut URLs (optional)
+
+If you still prefer shortcut URLs, use your **account key** from Control Settings:
 
 ```
-https://presentation-ten-orpin.vercel.app/present/c7da/next_slide
-https://presentation-ten-orpin.vercel.app/present/c7da/prev_slide
-https://presentation-ten-orpin.vercel.app/present/c7da/reset_slide
+https://your-domain.com/present/<account-key>/next_slide
+https://your-domain.com/present/<account-key>/prev_slide
+https://your-domain.com/present/<account-key>/reset_slide
 ```
 
 `reset_slide` sends the presentation to slide 1.  
 Supported shortcut actions: `next_slide`, `prev_slide`, `reset_slide`.
 
-#### iOS Shortcut setup (step-by-step)
-
-1. Create 3 shortcuts on iPhone:
-  - `https://presentation-ten-orpin.vercel.app/present/c7da/next_slide`
-  - `https://presentation-ten-orpin.vercel.app/present/c7da/prev_slide`
-  - `https://presentation-ten-orpin.vercel.app/present/c7da/reset_slide`
-2. In each shortcut add: URL -> Get Contents of URL (GET).
-3. Show these shortcuts on Apple Watch.
-4. Keep presenter tab open and signed in with the same account.
-
-If you want to customize actions later, replace only the last path segment:
-
-- `next_slide`
-- `prev_slide`
-- `reset_slide`
-
-Example structure:
-
-```
-https://presentation-ten-orpin.vercel.app/present/<presentation-key>/<action>
-```
-
-Legacy steps kept for reference:
-
-1. Start presentation on Mac and click `?` in presenter to see your URLs.
-2. On iPhone, open **Shortcuts** and create shortcut **Next**.
-3. Add action **URL** with one of your shortcut URLs.
-4. Add action **Get Contents of URL** (method: `GET`).
-5. Create two more shortcuts for:
-   - `.../prev_slide`
-   - `.../reset_slide`
-6. In Watch app (or Shortcuts on Apple Watch), enable/show these shortcuts.
 
 ### Keyboard shortcuts (presenter view)
 
@@ -201,16 +174,19 @@ src/providers/
 │   ├── App.jsx                  # Router + auth wrapper
 │   ├── lib/
 │   │   ├── supabase.js          # Supabase client
-│   │   └── presentationKey.js   # Stable presentation key helper
+│   │   └── presentationKey.js   # Account key helpers
 │   ├── hooks/
 │   │   ├── useAuth.jsx          # Auth context + hook
 │   │   └── useRealtimeCommands.js # Realtime channel hook
 │   ├── components/
 │   │   └── ProtectedRoute.jsx   # Auth guard
 │   ├── pages/
+│   │   ├── HomePage.jsx         # Marketing + overview
 │   │   ├── LoginPage.jsx        # Login / signup form
 │   │   ├── DashboardPage.jsx    # Deck list + upload + session creation
 │   │   ├── PresenterPage.jsx    # Live slide viewer
+│   │   ├── ControlPage.jsx      # Device remote control
+│   │   ├── ControlSettingsPage.jsx# Control setup + account key
 │   │   └── ShortcutCommandPage.jsx # URL-triggered shortcut commands
 │   └── providers/
 │       ├── index.js             # Office renderer registry

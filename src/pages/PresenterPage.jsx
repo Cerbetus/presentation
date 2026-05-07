@@ -3,7 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useRealtimeCommands } from "../hooks/useRealtimeCommands";
 import { getProvider } from "../providers";
-import { buildPresentationKey } from "../lib/presentationKey";
+import {
+  buildAccountKey,
+  buildSessionChannel,
+} from "../lib/presentationKey";
+import { useSession } from "../hooks/useAuth";
+import Footer from "../components/Footer";
 
 const COMMAND_LABELS = {
   next: "Next slide",
@@ -11,41 +16,90 @@ const COMMAND_LABELS = {
   first: "Reset to slide 1",
 };
 
+function getFullscreenElement() {
+  if (typeof document === "undefined") return null;
+  return (
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement ||
+    null
+  );
+}
+
+function requestFullscreen(target) {
+  if (!target) return Promise.reject(new Error("Missing fullscreen target"));
+  const request =
+    target.requestFullscreen ||
+    target.webkitRequestFullscreen ||
+    target.mozRequestFullScreen ||
+    target.msRequestFullscreen;
+  if (!request) return Promise.reject(new Error("Fullscreen not supported"));
+  return request.call(target);
+}
+
+function exitFullscreen() {
+  if (typeof document === "undefined") return Promise.resolve();
+  const exit =
+    document.exitFullscreen ||
+    document.webkitExitFullscreen ||
+    document.mozCancelFullScreen ||
+    document.msExitFullscreen;
+  if (!exit) return Promise.resolve();
+  return exit.call(document);
+}
+
 export default function PresenterPage() {
   const { sessionId } = useParams();
+  const session = useSession();
   const [deck, setDeck] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(1);
   const [totalSlides, setTotalSlides] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showWatchHelp, setShowWatchHelp] = useState(false);
+  const [showControlHelp, setShowControlHelp] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [error, setError] = useState(null);
 
   const totalSlidesRef = useRef(totalSlides);
   const rootRef = useRef(null);
+  const viewerRef = useRef(null);
+  const fullscreenTargetRef = useRef(null);
 
   useEffect(() => {
     totalSlidesRef.current = totalSlides;
   }, [totalSlides]);
 
   const toggleFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) {
-      const target = rootRef.current ?? document.documentElement;
-      await target.requestFullscreen();
+    if (!getFullscreenElement()) {
+      const target =
+        fullscreenTargetRef.current ??
+        viewerRef.current ??
+        rootRef.current ??
+        document.documentElement;
+      await requestFullscreen(target);
       return;
     }
 
-    await document.exitFullscreen();
+    await exitFullscreen();
   }, []);
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      setIsFullscreen(Boolean(getFullscreenElement()));
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+    document.addEventListener("mozfullscreenchange", onFullscreenChange);
+    document.addEventListener("MSFullscreenChange", onFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", onFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", onFullscreenChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,11 +130,12 @@ export default function PresenterPage() {
     }
   }, []);
 
-  const presentationKey = deck
-    ? buildPresentationKey(deck.name, deck.id)
-    : null;
-
-  useRealtimeCommands(presentationKey, handleCommand);
+  const accountKey = buildAccountKey(session?.user?.id);
+  const accountChannel = buildSessionChannel(accountKey);
+  const { sendState, channelStatus } = useRealtimeCommands(
+    accountChannel,
+    handleCommand
+  );
 
   useEffect(() => {
     (async () => {
@@ -136,12 +191,42 @@ export default function PresenterPage() {
 
   const handleTotalSlidesKnown = useCallback((n) => setTotalSlides(n), []);
 
+  const broadcastState = useCallback(() => {
+    if (!deck || !accountKey) return;
+
+    sendState({
+      currentSlide,
+      totalSlides,
+      deckName: deck.name,
+      sessionId,
+      accountKey,
+    });
+  }, [accountKey, currentSlide, deck, sendState, sessionId, totalSlides]);
+
+  useEffect(() => {
+    broadcastState();
+  }, [broadcastState]);
+
+  useEffect(() => {
+    if (channelStatus === "subscribed") {
+      broadcastState();
+    }
+  }, [channelStatus, broadcastState]);
+
+  useEffect(() => {
+    if (!deck || !accountKey) return;
+    const interval = window.setInterval(() => {
+      broadcastState();
+    }, 4000);
+    return () => window.clearInterval(interval);
+  }, [accountKey, broadcastState, deck]);
+
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-red-400">{error}</p>
-          <Link to="/" className="text-blue-400 underline">
+      <div className="app-shell flex items-center justify-center px-6">
+        <div className="glass-card p-6 text-center space-y-4 max-w-md">
+          <p className="text-red-100">{error}</p>
+          <Link to="/dashboard" className="glass-button">
             Back to dashboard
           </Link>
         </div>
@@ -151,8 +236,8 @@ export default function PresenterPage() {
 
   if (!deck) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading session…</p>
+      <div className="app-shell flex items-center justify-center px-6">
+        <div className="glass-panel px-6 py-4 animate-pulse">Loading session…</div>
       </div>
     );
   }
@@ -166,111 +251,137 @@ export default function PresenterPage() {
     ? `${supabaseUrl}/functions/v1/post-command`
     : null;
 
-  const shortcutUrls = {
-    next: functionBaseUrl
-      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=next_slide`
-      : `${origin}/present/${presentationKey}/next_slide`,
-    prev: functionBaseUrl
-      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=prev_slide`
-      : `${origin}/present/${presentationKey}/prev_slide`,
-    reset: functionBaseUrl
-      ? `${functionBaseUrl}?key=${encodeURIComponent(presentationKey)}&action=reset_slide`
-      : `${origin}/present/${presentationKey}/reset_slide`,
-  };
+  const shortcutUrls = accountKey
+    ? {
+        next: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=next_slide`
+          : `${origin}/present/${accountKey}/next_slide`,
+        prev: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=prev_slide`
+          : `${origin}/present/${accountKey}/prev_slide`,
+        reset: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=reset_slide`
+          : `${origin}/present/${accountKey}/reset_slide`,
+      }
+    : null;
 
   return (
     <div
       ref={rootRef}
-      className={`min-h-screen text-white flex flex-col relative ${
-        isFullscreen ? "bg-black" : "bg-gray-950"
-      }`}
+      className={`app-shell flex flex-col ${isFullscreen ? "bg-black" : ""}`}
     >
       {toastMessage && (
-        <div className="fixed top-4 left-4 z-50 rounded-lg border border-green-400/30 bg-green-900/80 px-3 py-2 text-sm text-green-100 shadow-lg">
+        <div className="fixed top-4 left-4 z-50 rounded-full border border-emerald-300/40 bg-emerald-400/20 px-4 py-2 text-sm text-emerald-100 shadow-lg">
           {toastMessage}
         </div>
       )}
 
       {!isFullscreen && (
-        <header className="flex items-center justify-between px-4 py-2 border-b border-gray-800 text-sm relative">
-          <Link to="/" className="text-gray-400 hover:text-white">
-            ← Dashboard
-          </Link>
-          <span className="text-gray-400">{deck.name}</span>
-          <button
-            onClick={() => setShowWatchHelp((v) => !v)}
-            className="w-7 h-7 rounded-full border border-gray-600 text-gray-300 hover:text-white hover:border-gray-400"
-            title="Watch setup"
-          >
-            ?
-          </button>
+        <header className="app-nav relative">
+          <div className="flex items-center gap-3">
+            <Link to="/dashboard" className="glass-button glass-button-ghost text-sm">
+              Dashboard
+            </Link>
+            <span className="text-sm muted">{deck.name}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowControlHelp((v) => !v)}
+              className="glass-button text-sm"
+              title="Control setup"
+            >
+              Control setup
+            </button>
+          </div>
 
-          {showWatchHelp && (
-            <div className="absolute right-4 top-11 w-[28rem] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-700 bg-gray-900 p-4 shadow-2xl z-40 text-xs">
-              <p className="text-gray-200 font-semibold mb-2">Apple Watch setup</p>
-              <p className="text-gray-400 mb-3">
-                Use one presentation key for the whole talk. The same key works for next, previous, and reset.
+          {showControlHelp && (
+            <div className="absolute right-6 top-[72px] w-[30rem] max-w-[calc(100vw-3rem)] glass-card p-4 text-xs space-y-3 z-40">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold">Remote control</p>
+                <span className="pill">Live</span>
+              </div>
+              <p className="muted">
+                Open /control on your phone or tablet and sign in once with this account. It
+                stays connected and shows the current slide.
               </p>
-              <p className="text-gray-400 mb-3">Use these URLs on Apple Watch or iPhone shortcuts:</p>
-              <code className="block text-blue-300 mb-1 break-all">Next: {shortcutUrls.next}</code>
-              <code className="block text-blue-300 mb-1 break-all">Previous: {shortcutUrls.prev}</code>
-              <code className="block text-blue-300 mb-3 break-all">Reset: {shortcutUrls.reset}</code>
-              <p className="text-gray-400">No separate watch sign-in page is needed.</p>
+              <div className="glass-panel p-3">
+                <p className="text-[10px] uppercase tracking-[0.3em] muted">Account key</p>
+                <p className="text-sm font-semibold tracking-[0.3em]">{accountKey}</p>
+              </div>
+              {shortcutUrls ? (
+                <div className="space-y-1">
+                  <p className="muted">Account-wide shortcut URLs (optional):</p>
+                  <code className="block text-sky-200 break-all">Next: {shortcutUrls.next}</code>
+                  <code className="block text-sky-200 break-all">Previous: {shortcutUrls.prev}</code>
+                  <code className="block text-sky-200 break-all">Reset: {shortcutUrls.reset}</code>
+                </div>
+              ) : (
+                <p className="muted">Shortcut URLs are unavailable until your account key loads.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Link to="/control" className="glass-button glass-button-primary text-xs">
+                  Open /control
+                </Link>
+                <Link to="/settings/control" className="glass-button text-xs">
+                  Control settings
+                </Link>
+              </div>
             </div>
           )}
         </header>
       )}
 
       <main
-        className={`flex-1 flex items-center justify-center ${
-          isFullscreen ? "p-0" : "p-4"
+        ref={viewerRef}
+        className={`flex-1 flex ${
+          isFullscreen
+            ? "p-0 w-screen h-screen"
+            : "items-center justify-center px-6 py-8"
         }`}
       >
-        <div className={isFullscreen ? "w-full h-full" : "w-full max-w-5xl"}>
-          <Viewer
-            fileUrl={fileUrl}
-            currentSlide={currentSlide}
-            totalSlides={totalSlides}
-            onTotalSlidesKnown={handleTotalSlidesKnown}
-            fullscreen={isFullscreen}
-          />
+        <div className={isFullscreen ? "w-full h-full" : "w-full max-w-6xl"}>
+          <div className={isFullscreen ? "" : "glass-panel p-4"}>
+            <Viewer
+              fileUrl={fileUrl}
+              currentSlide={currentSlide}
+              totalSlides={totalSlides}
+              onTotalSlidesKnown={handleTotalSlidesKnown}
+              fullscreen={isFullscreen}
+              fullscreenTargetRef={fullscreenTargetRef}
+            />
+          </div>
         </div>
       </main>
 
       {!isFullscreen && (
-        <footer className="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-800 text-sm">
-          <button
-            onClick={() => setCurrentSlide((s) => Math.max(s - 1, 1))}
-            className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 transition"
-          >
-            ◀ Prev
-          </button>
-          <span className="text-gray-400 tabular-nums">
-            {currentSlide} / {totalSlides}
-          </span>
-          <button
-            onClick={() => setCurrentSlide((s) => Math.min(s + 1, totalSlides))}
-            className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 transition"
-          >
-            Next ▶
-          </button>
-          <button
-            onClick={() => toggleFullscreen().catch(() => {})}
-            className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 transition"
-          >
-            Fullscreen
-          </button>
-        </footer>
+        <>
+          <footer className="flex items-center justify-center gap-3 px-6 py-4 border-t border-white/10">
+            <button
+              onClick={() => setCurrentSlide((s) => Math.max(s - 1, 1))}
+              className="glass-button text-sm"
+            >
+              ◀ Prev
+            </button>
+            <span className="pill tabular-nums">
+              {currentSlide} / {totalSlides}
+            </span>
+            <button
+              onClick={() => setCurrentSlide((s) => Math.min(s + 1, totalSlides))}
+              className="glass-button glass-button-primary text-sm"
+            >
+              Next ▶
+            </button>
+            <button
+              onClick={() => toggleFullscreen().catch(() => {})}
+              className="glass-button text-sm"
+            >
+              Fullscreen
+            </button>
+          </footer>
+          <Footer />
+        </>
       )}
 
-      {isFullscreen && (
-        <button
-          onClick={() => toggleFullscreen().catch(() => {})}
-          className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white text-xs px-3 py-1 rounded border border-white/20"
-        >
-          Exit Fullscreen
-        </button>
-      )}
     </div>
   );
 }

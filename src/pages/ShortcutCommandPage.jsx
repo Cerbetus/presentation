@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { buildSessionChannel } from "../lib/presentationKey";
+import Footer from "../components/Footer";
 
 const ACTION_TO_COMMAND = {
   next_slide: "next",
@@ -21,8 +23,8 @@ function parseShortcutAction(shortcutAction) {
 }
 
 export default function ShortcutCommandPage() {
-  const { presentationKey, shortcutAction } = useParams();
-  const [status, setStatus] = useState("Sending command…");
+  const { accountKey, shortcutAction } = useParams();
+  const [status, setStatus] = useState("Sending command...");
   const [error, setError] = useState(null);
   const parsed = useMemo(
     () => parseShortcutAction(shortcutAction),
@@ -30,7 +32,7 @@ export default function ShortcutCommandPage() {
   );
 
   useEffect(() => {
-    if (!presentationKey || !parsed) {
+    if (!accountKey || !parsed) {
       setError(
         "Invalid shortcut URL. Use next_slide, prev_slide, or reset_slide."
       );
@@ -42,18 +44,19 @@ export default function ShortcutCommandPage() {
     let activeChannel = null;
     let subscribeTimeout = null;
     let settled = false;
-    const normalizedKey = presentationKey.trim().toLowerCase();
+    const normalizedKey = accountKey.trim().toLowerCase();
 
     (async () => {
       if (!/^[a-z0-9]{2,32}$/.test(normalizedKey)) {
         setError(
-          "Invalid or expired shortcut URL. Open Presenter and copy the latest session shortcut URLs."
+          "Invalid or expired shortcut URL. Open Control settings to copy your account key."
         );
         setStatus(null);
         return;
       }
 
-      const channel = supabase.channel(`session:${normalizedKey}`);
+      const channelName = buildSessionChannel(normalizedKey);
+      const channel = supabase.channel(channelName);
       activeChannel = channel;
 
       // Prevent indefinite "Sending command…" when the channel cannot subscribe.
@@ -128,36 +131,58 @@ export default function ShortcutCommandPage() {
       if (subscribeTimeout) window.clearTimeout(subscribeTimeout);
       if (activeChannel) supabase.removeChannel(activeChannel);
     };
-  }, [parsed, presentationKey]);
+  }, [parsed, accountKey]);
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-lg">
-          <p className="text-red-400">{error}</p>
-          <p className="text-gray-500 text-sm">
-            Example:
-            {" "}
-            <code className="text-gray-300">
-              /present/&lt;presentation-key&gt;/next_slide
-            </code>
-          </p>
-          <Link to="/" className="text-blue-400 underline">
-            Dashboard
+      <div className="app-shell">
+        <header className="app-nav">
+          <Link to="/" className="brand">
+            Presentation Remote
           </Link>
-        </div>
+          <div className="nav-links">
+            <Link to="/">Home</Link>
+            <Link to="/control">Control</Link>
+          </div>
+        </header>
+
+        <main className="flex items-center justify-center p-6">
+          <div className="glass-card p-6 text-center space-y-4 max-w-lg">
+            <p className="text-red-100">{error}</p>
+            <p className="muted text-sm">
+              Example: <span className="text-sky-200">/present/&lt;account-key&gt;/next_slide</span>
+            </p>
+            <Link to="/settings/control" className="glass-button">
+              Control settings
+            </Link>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
-      <div className="text-center space-y-4">
-        <p className="text-gray-200">{status}</p>
-        <p className="text-xs text-gray-500">
-          Session: <span className="text-gray-300">{presentationKey}</span>
-        </p>
-      </div>
+    <div className="app-shell">
+      <header className="app-nav">
+        <Link to="/" className="brand">
+          Presentation Remote
+        </Link>
+        <div className="nav-links">
+          <Link to="/">Home</Link>
+          <Link to="/control">Control</Link>
+        </div>
+      </header>
+
+      <main className="flex items-center justify-center p-6">
+        <div className="glass-card p-6 text-center space-y-3">
+          <p className="text-lg">{status}</p>
+          <p className="text-xs muted">
+            Key: <span className="text-sky-200">{accountKey}</span>
+          </p>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }
