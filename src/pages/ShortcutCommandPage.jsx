@@ -30,6 +30,10 @@ export default function ShortcutCommandPage() {
     () => parseShortcutAction(shortcutAction),
     [shortcutAction]
   );
+  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const functionBaseUrl = supabaseUrl
+    ? `${supabaseUrl}/functions/v1/post-command`
+    : "";
 
   useEffect(() => {
     if (!accountKey || !parsed) {
@@ -44,7 +48,12 @@ export default function ShortcutCommandPage() {
     let activeChannel = null;
     let subscribeTimeout = null;
     let settled = false;
+    let requestController = null;
+    let requestTimeout = null;
     const normalizedKey = accountKey.trim().toLowerCase();
+
+    setError(null);
+    setStatus("Sending command...");
 
     (async () => {
       if (!/^[a-z0-9]{2,32}$/.test(normalizedKey)) {
@@ -53,6 +62,52 @@ export default function ShortcutCommandPage() {
         );
         setStatus(null);
         return;
+      }
+
+      if (functionBaseUrl) {
+        requestController = new AbortController();
+        requestTimeout = window.setTimeout(() => requestController.abort(), 6000);
+
+        try {
+          const url = new URL(functionBaseUrl);
+          url.searchParams.set("key", normalizedKey);
+          url.searchParams.set("action", parsed.action);
+
+          const response = await fetch(url.toString(), {
+            method: "GET",
+            cache: "no-store",
+            signal: requestController.signal,
+          });
+
+          let payload = null;
+          try {
+            payload = await response.json();
+          } catch {
+            payload = null;
+          }
+
+          if (disposed) return;
+
+          if (!response.ok || !payload?.delivered) {
+            setError(payload?.error || "Failed to send command.");
+            setStatus(null);
+            return;
+          }
+
+          setStatus(`Sent: ${parsed.action}`);
+          return;
+        } catch (err) {
+          if (disposed) return;
+          if (err?.name === "AbortError") {
+            setError("Request timed out. Try again.");
+          } else {
+            setError("Unable to reach presentation session.");
+          }
+          setStatus(null);
+          return;
+        } finally {
+          if (requestTimeout) window.clearTimeout(requestTimeout);
+        }
       }
 
       const channelName = buildSessionChannel(normalizedKey);
@@ -128,10 +183,12 @@ export default function ShortcutCommandPage() {
 
     return () => {
       disposed = true;
+      if (requestController) requestController.abort();
+      if (requestTimeout) window.clearTimeout(requestTimeout);
       if (subscribeTimeout) window.clearTimeout(subscribeTimeout);
       if (activeChannel) supabase.removeChannel(activeChannel);
     };
-  }, [parsed, accountKey]);
+  }, [parsed, accountKey, functionBaseUrl]);
 
   if (error) {
     return (

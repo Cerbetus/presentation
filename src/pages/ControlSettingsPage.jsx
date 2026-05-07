@@ -8,12 +8,22 @@ export default function ControlSettingsPage() {
   const accountKey = buildAccountKey(session?.user?.id);
   const origin =
     typeof window === "undefined" ? "https://<yourdomain>" : window.location.origin;
+  const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const functionBaseUrl = supabaseUrl
+    ? `${supabaseUrl}/functions/v1/post-command`
+    : null;
 
   const shortcutUrls = accountKey
     ? {
-        next: `${origin}/present/${accountKey}/next_slide`,
-        prev: `${origin}/present/${accountKey}/prev_slide`,
-        reset: `${origin}/present/${accountKey}/reset_slide`,
+        next: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=next_slide`
+          : `${origin}/present/${accountKey}/next_slide`,
+        prev: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=prev_slide`
+          : `${origin}/present/${accountKey}/prev_slide`,
+        reset: functionBaseUrl
+          ? `${functionBaseUrl}?key=${encodeURIComponent(accountKey)}&action=reset_slide`
+          : `${origin}/present/${accountKey}/reset_slide`,
       }
     : null;
 

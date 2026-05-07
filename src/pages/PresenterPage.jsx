@@ -28,14 +28,23 @@ function getFullscreenElement() {
 }
 
 function requestFullscreen(target) {
-  if (!target) return Promise.reject(new Error("Missing fullscreen target"));
+  const element = target ?? document.documentElement;
+  if (!element) return Promise.reject(new Error("Missing fullscreen target"));
   const request =
-    target.requestFullscreen ||
-    target.webkitRequestFullscreen ||
-    target.mozRequestFullScreen ||
-    target.msRequestFullscreen;
-  if (!request) return Promise.reject(new Error("Fullscreen not supported"));
-  return request.call(target);
+    element.requestFullscreen ||
+    element.webkitRequestFullscreen ||
+    element.mozRequestFullScreen ||
+    element.msRequestFullscreen;
+  if (request) return request.call(element);
+
+  const fallback =
+    document.documentElement?.requestFullscreen ||
+    document.documentElement?.webkitRequestFullscreen ||
+    document.documentElement?.mozRequestFullScreen ||
+    document.documentElement?.msRequestFullscreen;
+
+  if (!fallback) return Promise.reject(new Error("Fullscreen not supported"));
+  return fallback.call(document.documentElement);
 }
 
 function exitFullscreen() {
@@ -71,36 +80,54 @@ export default function PresenterPage() {
   }, [totalSlides]);
 
   const toggleFullscreen = useCallback(async () => {
-    if (!getFullscreenElement()) {
-      const target =
-        fullscreenTargetRef.current ??
-        viewerRef.current ??
-        rootRef.current ??
-        document.documentElement;
-      await requestFullscreen(target);
-      return;
-    }
+    try {
+      if (!getFullscreenElement()) {
+        const target =
+          fullscreenTargetRef.current ??
+          viewerRef.current ??
+          rootRef.current ??
+          document.documentElement;
+        await requestFullscreen(target);
+        return;
+      }
 
-    await exitFullscreen();
-  }, []);
+      await exitFullscreen();
+    } catch (err) {
+      setToastMessage("Fullscreen blocked by browser.");
+    }
+  }, [setToastMessage]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
       setIsFullscreen(Boolean(getFullscreenElement()));
     };
 
+    const onFullscreenError = () => {
+      setToastMessage("Fullscreen blocked by browser.");
+    };
+
+    onFullscreenChange();
+
     document.addEventListener("fullscreenchange", onFullscreenChange);
     document.addEventListener("webkitfullscreenchange", onFullscreenChange);
     document.addEventListener("mozfullscreenchange", onFullscreenChange);
     document.addEventListener("MSFullscreenChange", onFullscreenChange);
+    document.addEventListener("fullscreenerror", onFullscreenError);
+    document.addEventListener("webkitfullscreenerror", onFullscreenError);
+    document.addEventListener("mozfullscreenerror", onFullscreenError);
+    document.addEventListener("MSFullscreenError", onFullscreenError);
 
     return () => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
       document.removeEventListener("mozfullscreenchange", onFullscreenChange);
       document.removeEventListener("MSFullscreenChange", onFullscreenChange);
+      document.removeEventListener("fullscreenerror", onFullscreenError);
+      document.removeEventListener("webkitfullscreenerror", onFullscreenError);
+      document.removeEventListener("mozfullscreenerror", onFullscreenError);
+      document.removeEventListener("MSFullscreenError", onFullscreenError);
     };
-  }, []);
+  }, [setToastMessage]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -179,7 +206,7 @@ export default function PresenterPage() {
           break;
         case "f":
         case "F":
-          toggleFullscreen().catch(() => {});
+          toggleFullscreen();
           break;
         default:
           break;
@@ -265,6 +292,10 @@ export default function PresenterPage() {
       }
     : null;
 
+  const stageStyle = isFullscreen
+    ? undefined
+    : { maxHeight: "calc(100vh - 260px)" };
+
   return (
     <div
       ref={rootRef}
@@ -348,6 +379,7 @@ export default function PresenterPage() {
               onTotalSlidesKnown={handleTotalSlidesKnown}
               fullscreen={isFullscreen}
               fullscreenTargetRef={fullscreenTargetRef}
+              style={stageStyle}
             />
           </div>
         </div>
@@ -372,7 +404,7 @@ export default function PresenterPage() {
               Next ▶
             </button>
             <button
-              onClick={() => toggleFullscreen().catch(() => {})}
+              onClick={() => toggleFullscreen()}
               className="glass-button text-sm"
             >
               Fullscreen

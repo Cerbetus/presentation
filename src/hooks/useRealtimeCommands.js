@@ -69,34 +69,26 @@ export function useRealtimeCommands(channelName, onCommand, onState) {
     };
   }, [channelName]);
 
-  const sendBroadcast = useCallback(
-    (event, payload) => {
-      const channel = channelRef.current;
-      if (!channel) return;
-
-      const message = { type: "broadcast", event, payload };
-      if (channelStatus === "subscribed" || typeof channel.httpSend !== "function") {
-        channel.send(message);
-      } else {
-        channel.httpSend(message);
-      }
-    },
-    [channelStatus]
-  );
-
   const sendCommand = useCallback(
     (type, extra = {}) => {
-      sendBroadcast("command", { type, ...extra, ts: Date.now() });
+      if (!channelRef.current) return;
+      channelRef.current.send({
+        type: "broadcast",
+        event: "command",
+        payload: { type, ...extra, ts: Date.now() },
+      });
     },
-    [sendBroadcast]
+    []
   );
 
-  const sendState = useCallback(
-    (payload = {}) => {
-      sendBroadcast("state", { ...payload, ts: Date.now() });
-    },
-    [sendBroadcast]
-  );
+  const sendState = useCallback((payload = {}) => {
+    if (!channelRef.current) return;
+    channelRef.current.send({
+      type: "broadcast",
+      event: "state",
+      payload: { ...payload, ts: Date.now() },
+    });
+  }, []);
 
   return { sendCommand, sendState, channelStatus };
 }

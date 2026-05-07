@@ -37,6 +37,8 @@ function SlideViewer({
   onTotalSlidesKnown,
   fullscreen = false,
   fullscreenTargetRef,
+  className = "",
+  style,
 }) {
   const [syncedSlide, setSyncedSlide] = useState(currentSlide);
   const [frameUrls, setFrameUrls] = useState([null, null]);
@@ -186,7 +188,8 @@ function SlideViewer({
       <div
         className={`relative w-full bg-gray-900 flex items-center justify-center ${
           fullscreen ? "h-full" : "aspect-video rounded-xl"
-        }`}
+        } ${className}`}
+        style={style}
       >
         <p className="text-gray-400 text-center px-4">
           Preparing Office 365 viewer…
@@ -199,7 +202,8 @@ function SlideViewer({
     <div
       className={`relative w-full bg-gray-900 overflow-hidden ${
         fullscreen ? "h-full" : "aspect-video rounded-xl"
-      }`}
+      } ${className}`}
+      style={style}
     >
       {frameUrls.map((url, index) => {
         if (!url) return null;
