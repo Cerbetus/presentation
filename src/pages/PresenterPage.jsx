@@ -66,6 +66,7 @@ export default function PresenterPage() {
   const [currentSlide, setCurrentSlide] = useState(1);
   const [totalSlides, setTotalSlides] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [renderNonce, setRenderNonce] = useState(0);
   const [showControlHelp, setShowControlHelp] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [error, setError] = useState(null);
@@ -74,6 +75,7 @@ export default function PresenterPage() {
   const rootRef = useRef(null);
   const viewerRef = useRef(null);
   const fullscreenTargetRef = useRef(null);
+  const wasFullscreenRef = useRef(false);
 
   useEffect(() => {
     totalSlidesRef.current = totalSlides;
@@ -128,6 +130,13 @@ export default function PresenterPage() {
       document.removeEventListener("MSFullscreenError", onFullscreenError);
     };
   }, [setToastMessage]);
+
+  useEffect(() => {
+    if (wasFullscreenRef.current && !isFullscreen) {
+      setRenderNonce(Date.now());
+    }
+    wasFullscreenRef.current = isFullscreen;
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -379,6 +388,7 @@ export default function PresenterPage() {
               onTotalSlidesKnown={handleTotalSlidesKnown}
               fullscreen={isFullscreen}
               fullscreenTargetRef={fullscreenTargetRef}
+              renderNonce={renderNonce}
               style={stageStyle}
             />
           </div>

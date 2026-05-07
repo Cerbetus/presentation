@@ -1,5 +1,5 @@
 export default function Footer() {
-  const version = import.meta.env.VITE_APP_VERSION ?? "0.0.0";
+  const version = "0.0.1";
 
   return (
     <footer className="app-footer">

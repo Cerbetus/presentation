@@ -19,12 +19,15 @@ function isPptFile(fileName) {
   return typeof fileName === "string" && /\.pptx?$/i.test(fileName);
 }
 
-function getEmbedUrl(fileUrl, currentSlide) {
+function getEmbedUrl(fileUrl, currentSlide, renderNonce) {
   if (!fileUrl) return null;
 
   const embedUrl = new URL("https://view.officeapps.live.com/op/embed.aspx");
   embedUrl.searchParams.set("src", fileUrl);
   embedUrl.searchParams.set("wdSlideIndex", String(Math.max(1, currentSlide)));
+  if (renderNonce) {
+    embedUrl.searchParams.set("r", String(renderNonce));
+  }
 
   return embedUrl.toString();
 }
@@ -37,6 +40,7 @@ function SlideViewer({
   onTotalSlidesKnown,
   fullscreen = false,
   fullscreenTargetRef,
+  renderNonce = 0,
   className = "",
   style,
 }) {
@@ -103,8 +107,8 @@ function SlideViewer({
   }, [currentSlide, tryNativeOfficeStep]);
 
   const embedUrl = useMemo(
-    () => getEmbedUrl(fileUrl, syncedSlide),
-    [fileUrl, syncedSlide]
+    () => getEmbedUrl(fileUrl, syncedSlide, renderNonce),
+    [fileUrl, syncedSlide, renderNonce]
   );
 
   useEffect(() => {
@@ -160,8 +164,21 @@ function SlideViewer({
   }, []);
 
   useEffect(() => {
+    if (!embedUrl) return;
+    if (fullscreen) {
+      const currentVisible = visibleFrameRef.current;
+      targetUrlRef.current = embedUrl;
+      setVisibleFrame(currentVisible);
+      setFrameUrls(() => {
+        const next = [null, null];
+        next[currentVisible] = embedUrl;
+        return next;
+      });
+      return;
+    }
+
     queueFrameUrl(embedUrl);
-  }, [embedUrl, queueFrameUrl]);
+  }, [embedUrl, fullscreen, queueFrameUrl]);
 
   const handleFrameLoad = useCallback((frameIndex) => {
     const currentVisible = visibleFrameRef.current;
